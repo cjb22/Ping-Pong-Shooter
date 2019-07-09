@@ -4,6 +4,7 @@ import freenect
 import cv2
 import frame_convert2
 import time
+import math
 
 
 def nothing(x):
@@ -24,7 +25,10 @@ cv2.createTrackbar('Contour Length','Depth',0,6000,nothing)
 cv2.setTrackbarPos('Contour Length', 'Depth',1500)
 cv2.createTrackbar('Contour Area','Depth',0,200,nothing)
 cv2.setTrackbarPos('Contour Area', 'Depth',10)
-
+cv2.createTrackbar('Segment Length','Depth',0,500,nothing)
+cv2.setTrackbarPos('Segment Length', 'Depth',300)
+cv2.createTrackbar('Closeness Threshold','Depth',0,300,nothing)
+cv2.setTrackbarPos('Closeness Threshold', 'Depth',60)
 
 
 #Fetch Images
@@ -44,11 +48,13 @@ while 1:
     start = time.time()
 
     #Read Trackbars
-    low         = cv2.getTrackbarPos('Low', 'Depth')
-    high        = cv2.getTrackbarPos('High', 'Depth')
-    areaThresh  = cv2.getTrackbarPos('Contour Length', 'Depth')
-    lenThresh   = cv2.getTrackbarPos('Contour Area', 'Depth')
-    
+    low             = cv2.getTrackbarPos('Low', 'Depth')
+    high            = cv2.getTrackbarPos('High', 'Depth')
+    areaThresh      = cv2.getTrackbarPos('Contour Length', 'Depth')
+    lenThresh       = cv2.getTrackbarPos('Contour Area', 'Depth')
+    segmentLength   = cv2.getTrackbarPos('Segment Length', 'Depth')
+    segLenThreshold = cv2.getTrackbarPos('Closeness Threshold', 'Depth')
+
     imgray = get_depth()
 
     edges = cv2.Canny(imgray,low,high,3)
@@ -68,13 +74,36 @@ while 1:
             filteredContours.append(ctr)        
 
     #draw contours
-    print (len(filteredContours))
-    cv2.drawContours(imgray, filteredContours, -1, (0,255,0), 2)
+    #print (len(filteredContours))
+    #cv2.drawContours(imgray, filteredContours, -1, (0,255,0), 2)
 
-        
+
+    contourSegments = []
+    for ctr in filteredContours:
+        contourLength = len(ctr) / 300  
+        for i in range(contourLength):
+            a = ctr[ i * 300 : (i+1) * 300 ,:]
+            x0 = a[0][0][0]
+            x1 = a[-1][0][0]
+            y0 = a[0][0][1]
+            y1 = a[-1][0][1] 
+            distance = math.hypot(x1 - x0, y1 - y0)
+            if distance < segLenThreshold:
+                contourSegments.append( a )
+
+    
+    i = 0
+    for seg in contourSegments:
+        cv2.drawContours(imgray, seg, -1 , (0,255,0), 5)
+        #if i % 2 == 0:
+        #    cv2.drawContours(imgray, seg, -1 , (0,255,0), 3)
+        #else:
+        #    cv2.drawContours(imgray, seg, -1 , (0,255,0), 6)
+        #i = i + 1
+
     #Display the image
     cv2.imshow('Depth', imgray)
-    cv2.imshow('Edges', edges)
+    #cv2.imshow('Edges', edges)
     #cv2.imshow('Video', get_video())
     
     if cv2.waitKey(10) == 27:
@@ -87,5 +116,5 @@ while 1:
     #-------------------------------------------------------------------------------
     
 # When everything done, release the capture
-print("FPS: ", FPS)
+print 'FPS: ', FPS
 cv2.destroyAllWindows()
