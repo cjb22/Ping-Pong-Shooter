@@ -32,8 +32,8 @@ cv2.setTrackbarPos('Contour Area', 'Depth',10)
 
 
 #Kinect Image Functions
-def get_depth():
-    return frame_convert2.pretty_depth_cv(freenect.sync_get_depth()[0])
+def get_depth(img):
+    return frame_convert2.pretty_depth_cv(img)
 def get_video():
     return frame_convert2.video_cv(freenect.sync_get_video()[0])
 
@@ -81,7 +81,8 @@ def findHandLineSegments(contours, segmentLength, maxEndpointCloseness):
 
     return contourSegments
 
-
+def distanceInMeters(kinectReading):
+       return 0.1236 * math.tan( kinectReading / 2842.5 + 1.1863)
     
 #Main loop
 while 1:
@@ -97,8 +98,12 @@ while 1:
     #segmentLength       = cv2.getTrackbarPos('Segment Length', 'Depth')
     #segLenThreshold     = cv2.getTrackbarPos('Closeness Threshold', 'Depth')
 
-    imgray = get_depth()
+    #Get the raw 11-bit integer depth image, and make an 8-bit copy for OpenCV operations 
+    rawDepth = freenect.sync_get_depth()[0]
+    imgray = np.copy(rawDepth)
+    imgray = get_depth(imgray)
 
+    #Use canny to find the edges
     edges = cv2.Canny(imgray,cannyLow,cannyHigh,3)
 
     #Dilation and erosion 
@@ -124,21 +129,41 @@ while 1:
     contourSegmentsFar      = findHandLineSegments(filteredContours, 80, 30)
 
     #Draw the line segments
-    drawWithAlternatingThickness = True
-    print len(contourSegmentsMid)
-    if len(contourSegmentsMid) > 0:     
-        i = 0        
-        for seg in contourSegmentsMid:
-            if drawWithAlternatingThickness:
-                if i % 2 == 0:
-                    cv2.drawContours(imgray, seg, -1 , (0,255,0), 2)
-                else:
-                    cv2.drawContours(imgray, seg, -1 , (0,255,0), 6)
-                i = i + 1
-            else:
-                cv2.drawContours(imgray, seg, -1 , (0,255,0), 5)
+##    drawWithAlternatingThickness = False
+##    print len(contourSegmentsMid)
+##    if len(contourSegmentsMid) > 0:     
+##        i = 0        
+##        for seg in contourSegmentsMid:
+##            if drawWithAlternatingThickness:
+##                if i % 2 == 0:
+##                    cv2.drawContours(imgray, seg, -1 , (0,255,0), 2)
+##                else:
+##                    cv2.drawContours(imgray, seg, -1 , (0,255,0), 5)
+##                i = i + 1
+##            else:
+##                cv2.drawContours(imgray, seg, -1 , (0,255,0), 3)
+
+    #Depth sensing
+    pX, pY = 640/2, 480/2
+    distKin     = rawDepth [pY,pX]
+    dist = distanceInMeters(distKin)
+    cv2.circle(imgray,(pX,pY), 7, (0,255,0), -1)
+    cv2.putText(imgray, str(dist), (pX - 20, pY - 20), cv2.FONT_HERSHEY_SIMPLEX, 4, (0, 255, 0), 4)
+
+##    convexHulls = []
+##    if len(contourSegmentsFar) > 0:
+##        for seg in contourSegmentsShort:
+##            M = cv2.moments(seg)
+##            cX = int(M["m10"] / M["m00"])
+##            cY = int(M["m01"] / M["m00"])
+##            cv2.circle(image, (cX, cY), 7, (0, 255, 0), -1)
+            
             
         
+            
+
+
+    
 
     #Display the image
     cv2.imshow('Depth', imgray)
