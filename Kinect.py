@@ -81,9 +81,80 @@ def findHandLineSegments(contours, segmentLength, maxEndpointCloseness):
 
     return contourSegments
 
-def distanceInMeters(kinectReading):
-       return 0.1236 * math.tan( kinectReading / 2842.5 + 1.1863)
+#Function to draw line segments
+def drawSegments(segments, Thickness, drawWithAlternatingThickness = False, drawCircle = False):
+    i = 0
+    for seg in segments:
+        if not drawWithAlternatingThickness:
+            cv2.drawContours(imgray, seg, -1 , (0,255,0), Thickness)
+        else:
+            if i % 2 == 0:
+                cv2.drawContours(imgray, seg, -1 , (0,255,0), Thickness)
+            else:
+                cv2.drawContours(imgray, seg, -1 , (0,255,0), Thickness * 2)
+            i = i + 1
+
+        continue HERE
+        if drawCircle:
+            
     
+    
+
+#Calculate actual distance using a Kinect 360 reading
+def distanceInMeters(kinectReading):
+    #Depth sensing
+    #pX, pY = 640/2, 480/2
+    #distKin     = rawDepth [pY,pX]
+    #dist = distanceInMeters(distKin)
+    #cv2.circle(imgray,(pX,pY), 7, (0,255,0), -1)
+    #cv2.putText(imgray, str(dist), (pX - 20, pY - 20), cv2.FONT_HERSHEY_SIMPLEX, 4, (0, 255, 0), 4)
+    return 0.1236 * math.tan( kinectReading / 2842.5 + 1.1863)
+
+methodSelect = 1
+def findHulls(contourSegments, Range):
+    hulls = []
+    minDist = -1
+    maxDist = -1
+
+    if Range == "C" or Range == "Close":
+        minDist = 0.9
+        maxDist = 1.8
+    elif Range == "M" or Range == "Mid":
+        minDist = 1.5
+        maxDist = 2.5
+    elif Range == "F" or Range == "Far":
+        minDist = 2.5
+        maxDist = 4.0
+
+    for seg in contourSegments:
+        #Find the center using weighted average location
+        if methodSelect == 0:
+            px = 0
+            py = 0
+            for p in seg:
+                px += p[0][0]
+                py += p[0][1]
+            centerX = int(px/len(seg))
+            centerY = int(py/len(seg))
+            centerDist = distanceInMeters( rawDepth [centerY,centerX] )
+            if centerDist > minDist and centerDist < maxDist:
+                hulls.append(seg)
+
+        #Find the center using OpenCV moments
+        elif methodSelect == 1
+            M = cv2.moments(seg)
+            if M["m00"] > 0:
+                centerX = int(M["m10"] / M["m00"])
+                centerY = int(M["m01"] / M["m00"])
+                if centerX > 0 and centerX < 640 and centerY > 0 and centerY < 480:
+                    dist = rawDepth [centerY,centerX]
+                    centerDist = distanceInMeters(dist)
+                    if centerDist > minDist and centerDist < maxDist: 
+                        hulls.append(seg)
+    return hulls
+        
+
+        
 #Main loop
 while 1:
     #------------------------------------------------------------------------------
@@ -103,16 +174,16 @@ while 1:
     imgray = np.copy(rawDepth)
     imgray = get_depth(imgray)
 
-    #Use canny to find the edges
+    #Use Canny algorithm to find contours on the depth image
     edges = cv2.Canny(imgray,cannyLow,cannyHigh,3)
 
-    #Dilation and erosion 
+    #Dilation and erosion to make the edges more pronounced
     edKernel = np.ones((3,3),np.uint8)
     edges = cv2.dilate(edges, edKernel, iterations = 1)
 
     #Contour detection
     contours, hierarchy = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-    #Contour filtering
+    #Preliminary contour filtering
     filteredContours = []
     for ctr in contours:
         approx = cv2.approxPolyDP(ctr,0.01*cv2.arcLength(ctr,True),True)
@@ -129,34 +200,20 @@ while 1:
     contourSegmentsFar      = findHandLineSegments(filteredContours, 80, 30)
 
     #Draw the line segments
-##    drawWithAlternatingThickness = False
-##    print len(contourSegmentsMid)
-##    if len(contourSegmentsMid) > 0:     
-##        i = 0        
-##        for seg in contourSegmentsMid:
-##            if drawWithAlternatingThickness:
-##                if i % 2 == 0:
-##                    cv2.drawContours(imgray, seg, -1 , (0,255,0), 2)
-##                else:
-##                    cv2.drawContours(imgray, seg, -1 , (0,255,0), 5)
-##                i = i + 1
-##            else:
-##                cv2.drawContours(imgray, seg, -1 , (0,255,0), 3)
+    #drawSegments(contourSegmentsClose,3,True)
+    #drawSegments(contourSegmentsMid,3,True)
+    #drawSegments(contourSegmentsFar,3,True)
+    
+    #Convex hulls of hands
+    convexHulls = []
+    hullsClose = findHulls(contourSegmentsClose, "Close")
+    hullsMid = findHulls(contourSegmentsMid, "Mid")
+    hullsFar = findHulls(contourSegmentsFar, "Far")
 
-    #Depth sensing
-    pX, pY = 640/2, 480/2
-    distKin     = rawDepth [pY,pX]
-    dist = distanceInMeters(distKin)
-    cv2.circle(imgray,(pX,pY), 7, (0,255,0), -1)
-    cv2.putText(imgray, str(dist), (pX - 20, pY - 20), cv2.FONT_HERSHEY_SIMPLEX, 4, (0, 255, 0), 4)
-
-##    convexHulls = []
-##    if len(contourSegmentsFar) > 0:
-##        for seg in contourSegmentsShort:
-##            M = cv2.moments(seg)
-##            cX = int(M["m10"] / M["m00"])
-##            cY = int(M["m01"] / M["m00"])
-##            cv2.circle(image, (cX, cY), 7, (0, 255, 0), -1)
+    drawSegments(hullsClose,2)
+    drawSegments(hullsMid,4)
+    drawSegments(hullsFar,6)
+      
             
             
         
