@@ -82,7 +82,7 @@ def findHandLineSegments(contours, segmentLength, maxEndpointCloseness):
     return contourSegments
 
 #Function to draw line segments
-def drawSegments(segments, Thickness, drawWithAlternatingThickness = False, drawCircle = False):
+def drawSegments(segments, Thickness, drawWithAlternatingThickness = False):
     i = 0
     for seg in segments:
         if not drawWithAlternatingThickness:
@@ -94,13 +94,8 @@ def drawSegments(segments, Thickness, drawWithAlternatingThickness = False, draw
                 cv2.drawContours(imgray, seg, -1 , (0,255,0), Thickness * 2)
             i = i + 1
 
-        continue HERE
-        if drawCircle:
-            
-    
-    
-
-#Calculate actual distance using a Kinect 360 reading
+           
+#Calculate actual distance in meters using a Kinect 360 reading
 def distanceInMeters(kinectReading):
     #Depth sensing
     #pX, pY = 640/2, 480/2
@@ -110,51 +105,63 @@ def distanceInMeters(kinectReading):
     #cv2.putText(imgray, str(dist), (pX - 20, pY - 20), cv2.FONT_HERSHEY_SIMPLEX, 4, (0, 255, 0), 4)
     return 0.1236 * math.tan( kinectReading / 2842.5 + 1.1863)
 
-methodSelect = 1
-def findHulls(contourSegments, Range):
+#Function to find the center pixel location of a contour segment
+def findCenterCoordinates(seg):
+    coordinatesAreValid = False
+    centerX = -1
+    centerY = -1
+    M = cv2.moments(seg)
+    if M["m00"] > 0:
+        centerX = int(M["m10"] / M["m00"])
+        centerY = int(M["m01"] / M["m00"])  
+        if centerX > 0 and centerX < 640 and centerY > 0 and centerY < 480:
+            coordinatesAreValid = True
+    return centerX, centerY, coordinatesAreValid
+
+#Find hand shaped contour segments using depth filtering, center locations and the number of convex hull defects
+def findHandshapes(contourSegments, Range):
     hulls = []
     minDist = -1
     maxDist = -1
+    minDefects = -1
+    maxDefects = -1
+    
 
     if Range == "C" or Range == "Close":
-        minDist = 0.9
-        maxDist = 1.8
+        minDist = 0.5
+        maxDist = 1.6
+        minDefects = 5
+        maxDefects = 13
     elif Range == "M" or Range == "Mid":
         minDist = 1.5
         maxDist = 2.5
+        minDefects = 5
+        maxDefects = 13
     elif Range == "F" or Range == "Far":
         minDist = 2.5
         maxDist = 4.0
+        minDefects = 3
+        maxDefects = 10
+
+    
 
     for seg in contourSegments:
-        #Find the center using weighted average location
-        if methodSelect == 0:
-            px = 0
-            py = 0
-            for p in seg:
-                px += p[0][0]
-                py += p[0][1]
-            centerX = int(px/len(seg))
-            centerY = int(py/len(seg))
+
+        #First check if the segment is at the right depth and at a proper pixel location
+        centerX, centerY, coordinatesAreValid = findCenterCoordinates(seg)
+        if coordinatesAreValid:
             centerDist = distanceInMeters( rawDepth [centerY,centerX] )
             if centerDist > minDist and centerDist < maxDist:
-                hulls.append(seg)
 
-        #Find the center using OpenCV moments
-        elif methodSelect == 1
-            M = cv2.moments(seg)
-            if M["m00"] > 0:
-                centerX = int(M["m10"] / M["m00"])
-                centerY = int(M["m01"] / M["m00"])
-                if centerX > 0 and centerX < 640 and centerY > 0 and centerY < 480:
-                    dist = rawDepth [centerY,centerX]
-                    centerDist = distanceInMeters(dist)
-                    if centerDist > minDist and centerDist < maxDist: 
-                        hulls.append(seg)
+                #Next, check if the number of convex hull defects
+                hull = cv2.convexHull(seg,returnPoints = False)
+                defects = cv2.convexityDefects(seg,hull)
+                amtOfHullDefects = defects.shape[0]
+                if  amtOfHullDefects >= minDefects and amtOfHullDefects <= maxDefects:
+                    hulls.append(seg)
     return hulls
-        
 
-        
+
 #Main loop
 while 1:
     #------------------------------------------------------------------------------
@@ -195,7 +202,7 @@ while 1:
     #cv2.drawContours(imgray, filteredContours, -1, (0,255,0), 2)
 
     #Find line segments which might resemble a hand
-    contourSegmentsClose    = findHandLineSegments(filteredContours, 300, 80)
+    contourSegmentsClose    = findHandLineSegments(filteredContours, 345, 80)
     contourSegmentsMid      = findHandLineSegments(filteredContours, 200, 50)
     contourSegmentsFar      = findHandLineSegments(filteredContours, 80, 30)
 
@@ -205,11 +212,10 @@ while 1:
     #drawSegments(contourSegmentsFar,3,True)
     
     #Convex hulls of hands
-    convexHulls = []
-    hullsClose = findHulls(contourSegmentsClose, "Close")
-    hullsMid = findHulls(contourSegmentsMid, "Mid")
-    hullsFar = findHulls(contourSegmentsFar, "Far")
-
+    hullsClose      = findHandshapes(contourSegmentsClose, "Close")
+    hullsMid        = findHandshapes(contourSegmentsMid, "Mid")
+    hullsFar        = findHandshapes(contourSegmentsFar, "Far")
+    
     drawSegments(hullsClose,2)
     drawSegments(hullsMid,4)
     drawSegments(hullsFar,6)
