@@ -5,6 +5,7 @@ import cv2
 import frame_convert2
 import time
 import math
+import Queue
 
 
 def nothing(x):
@@ -118,6 +119,14 @@ def findCenterCoordinates(seg):
             coordinatesAreValid = True
     return centerX, centerY, coordinatesAreValid
 
+def findCenterCoordinatesMultiple(contours):
+    centerPoints = []
+    for ctr in contours:
+        ctrX, ctrY, isValid = findCenterCoordinates(ctr)
+        if isValid:
+            centerPoints.append([ctrX, ctrY])
+    return centerPoints
+
 #Find hand shaped contour segments using depth filtering, center locations and the number of convex hull defects
 def findHandshapes(contourSegments, Range):
     hulls = []
@@ -125,24 +134,26 @@ def findHandshapes(contourSegments, Range):
     maxDist = -1
     minDefects = -1
     maxDefects = -1
+    minArea = -1
     
-
     if Range == "C" or Range == "Close":
         minDist = 0.5
-        maxDist = 1.6
-        minDefects = 5
-        maxDefects = 13
+        maxDist = 1.4
+        minDefects = 4
+        maxDefects = 16
+        minArea = 1000
     elif Range == "M" or Range == "Mid":
-        minDist = 1.5
+        minDist = 1.2
         maxDist = 2.5
-        minDefects = 5
-        maxDefects = 13
+        minDefects = 4
+        maxDefects = 16
+        minArea = 600
     elif Range == "F" or Range == "Far":
         minDist = 2.5
         maxDist = 4.0
         minDefects = 3
         maxDefects = 10
-
+        minArea = 400
     
 
     for seg in contourSegments:
@@ -154,13 +165,24 @@ def findHandshapes(contourSegments, Range):
             if centerDist > minDist and centerDist < maxDist:
 
                 #Next, check if the number of convex hull defects
-                hull = cv2.convexHull(seg,returnPoints = False)
-                defects = cv2.convexityDefects(seg,hull)
+                cvxHull = cv2.convexHull(seg,returnPoints = False)
+                defects = cv2.convexityDefects(seg,cvxHull)
                 amtOfHullDefects = defects.shape[0]
                 if  amtOfHullDefects >= minDefects and amtOfHullDefects <= maxDefects:
-                    hulls.append(seg)
+                    hullArea = cv2.contourArea(cv2.convexHull(seg,returnPoints = True))
+                    segArea = cv2.contourArea(seg)
+                    segToHullRatio = hullArea / segArea
+                    if segArea > minArea and segToHullRatio > 1. and segToHullRatio < 1.5: 
+                        hulls.append(seg)
     return hulls
 
+
+
+lastFoundClose = np.empty(20, dtype = list)
+iterCount = 0
+maxToTrack = 20
+for i in range(maxToTrack):
+    lastFoundClose[i] = []
 
 #Main loop
 while 1:
@@ -202,7 +224,7 @@ while 1:
     #cv2.drawContours(imgray, filteredContours, -1, (0,255,0), 2)
 
     #Find line segments which might resemble a hand
-    contourSegmentsClose    = findHandLineSegments(filteredContours, 345, 80)
+    contourSegmentsClose    = findHandLineSegments(filteredContours, 370, 80)
     contourSegmentsMid      = findHandLineSegments(filteredContours, 200, 50)
     contourSegmentsFar      = findHandLineSegments(filteredContours, 80, 30)
 
@@ -212,17 +234,34 @@ while 1:
     #drawSegments(contourSegmentsFar,3,True)
     
     #Convex hulls of hands
-    hullsClose      = findHandshapes(contourSegmentsClose, "Close")
-    hullsMid        = findHandshapes(contourSegmentsMid, "Mid")
-    hullsFar        = findHandshapes(contourSegmentsFar, "Far")
+    handshapesClose     = findHandshapes(contourSegmentsClose, "Close")
+    handshapesMid       = findHandshapes(contourSegmentsMid, "Mid")
+    handshapesFar       = findHandshapes(contourSegmentsFar, "Far")
     
-    drawSegments(hullsClose,2)
-    drawSegments(hullsMid,4)
-    drawSegments(hullsFar,6)
-      
-            
-            
+    drawSegments(handshapesClose,2)
+    drawSegments(handshapesMid,4)
+    drawSegments(handshapesFar,6)
+
+    #Find the center coordinates of the hand shapes, and keep track of the most recent 'maxToTrack' iterations
+    centerPointsClose = findCenterCoordinatesMultiple(handshapesClose)
+    lastFoundClose[iterCount]  = centerPointsClose
+    
+    persistentCloseCenterPoints = []
+    for ctrPoint in centerPointsClose:
+        similarPointsFound = 0
+        for i in range(maxToTrack):
+            aPreviousIteration = lastFoundClose[i]
+            for prevCtrPoint in aPreviousIteration:
+                diffX = abs( ctrPoint[0] - prevCtrPoint[0] )
+                diffY = abs( ctrPoint[1] - prevCtrPoint[1] )
+                if diffX < 30 and diffY < 30:
+                    similarPointsFound += 1
+        if similarPointsFound > 6:
+            persistentCloseCenterPoints.append(ctrPoint)
         
+    print persistentCloseCenterPoints            
+
+            
             
 
 
@@ -232,7 +271,8 @@ while 1:
     cv2.imshow('Depth', imgray)
     #cv2.imshow('Edges', edges)
     #cv2.imshow('Video', get_video())
-    
+
+    iterCount = ( iterCount + 1 ) % maxToTrack 
     if cv2.waitKey(10) == 27:
         break
 
