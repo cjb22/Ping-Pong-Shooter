@@ -195,7 +195,7 @@ for i in range(iterationsToTrack):
     lastFoundFar[i]     = []
     
 def findPersistentCenterPoints(mostRecentCtrPoints, previousCtrPoints):
-    toReturn = None
+    toReturn = (-1,-1)
     similarPointsToFind = 6
     
     for ctrPoint in mostRecentCtrPoints:
@@ -287,19 +287,21 @@ while 1:
     drawSegments(handshapesMid,     4)
     drawSegments(handshapesFar,     6)
 
-    print "Close: ", handCoordinatesClose
-    print "Mid: ", handCoordinatesMid
-    print "Far: ", handCoordinatesFar
+    
+    
+    
 
-    if not type(handCoordinatesClose) == None:
+    if not handCoordinatesClose == (-1,-1):
         cv2.circle(imgray, handCoordinatesClose, 12, (0,255,0), 4)
+        print "Close: ", handCoordinatesClose
 
-    elif not type(handCoordinatesMid) == None:
+    elif not handCoordinatesMid == (-1,-1):
         cv2.circle(imgray, handCoordinatesMid, 14, (0,255,0), 4)
+        print "Mid: ", handCoordinatesMid
         
-    elif not type(handCoordinatesFar) == None:
+    elif not handCoordinatesFar == (-1,-1):
         cv2.circle(imgray, handCoordinatesFar, 16, (0,255,0), 4)
-
+        print "Far: ", handCoordinatesFar
     
     #if( type(handCoordinatesClose) == None) 
               
