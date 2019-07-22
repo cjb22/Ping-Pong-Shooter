@@ -5,7 +5,7 @@ import cv2
 import frame_convert2
 import time
 import math
-import MoveStepper
+import subprocess
 
 
 
@@ -39,11 +39,11 @@ def get_video():
     return frame_convert2.video_cv(freenect.sync_get_video()[0])
 
 #Depth camera general information
-xRes, yRes = 640, 480                                   # Width x Height  = 640 x 480 pixels
-horizonY = 360                                          # The Y pixel height which corresponds to horizontal plane (depends on physical angle of the Kinect)
-xFOV, yFOV = math.radians(58.5), math.radians(46.6)     # Field of view dimensions (degrees)
-radiansPerPixelX = xFOV / xRes                          # For simplification, a perfect camera model is assumed
-radiansPerPixelY = yFOV / yRes
+xRes, yRes = 640, 480               # Width x Height  = 640 x 480 pixels
+horizonY = 360                      # The Y pixel height which corresponds to horizontal plane (depends on physical angle of the Kinect)
+xFOV, yFOV = 58.5, 46.6             # Field of view dimensions (degrees)
+degreesPerPixelX = xFOV / xRes      # For simplification, a perfect camera model is assumed
+degreesPerPixelY = yFOV / yRes
 
 
 #Function to check if a point is within specified coordinates
@@ -321,22 +321,26 @@ while 1:
         
         horizPixelDistanceFromCenter =  toTossTo[0] - ( xRes / 2 )
         vertPixelDistanceFromHorizon  = horizonY - toTossTo[1]
+    
+        toTurnAngle = degreesPerPixelX * horizPixelDistanceFromCenter
+        launchAngle = degreesPerPixelY * vertPixelDistanceFromHorizon
 
-        toTurnAngle = radiansPerPixelX * horizPixelDistanceFromCenter
-        launchAngle = radiansPerPixelY * vertPixelDistanceFromHorizon
+        if toTurnAngle < -5 or toTurnAngle > 5:
+            subprocess.call("python2.7 MoveStepper.py " + str(toTurnAngle))
+            #MoveStepper.turnDegrees(toTurnAngle)
+
+        else:
+            distanceToHand = distanceInMeters( rawDepth [toTossTo[1], toTossTo[0]] )
+            horizDistanceMeters = distanceToHand * math.sin(math.radians(launchAngle))
+            vertDistanceMeters  = distanceToHand * math.cos(math.radians(launchAngle))
+
+            #cv2.putText(imgray, "Up  (m): " + str(horizDistanceMeters), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0))
+            #cv2.putText(imgray, "Out (m): " + str(vertDistanceMeters),  (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0))
+
         
-        
-        distanceToHand = distanceInMeters( rawDepth [toTossTo[1], toTossTo[0]] )
-        horizDistanceMeters = distanceToHand * math.sin(launchAngle)
-        vertDistanceMeters  = distanceToHand * math.cos(launchAngle)
-
-        #cv2.putText(imgray, "Up  (m): " + str(horizDistanceMeters), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0))
-        #cv2.putText(imgray, "Out (m): " + str(vertDistanceMeters),  (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0))
-
-        
 
 
-      
+    
     
 
     #Draw the horizontal plane line and a center line

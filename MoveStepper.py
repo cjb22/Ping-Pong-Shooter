@@ -15,7 +15,7 @@ GPIO.setup(DirectionPin, GPIO.OUT)
 StepPauseTime = 0.0005
 
     
-def PreciseTurn( dir, steps):
+def turnSteps( dir, steps):
     if dir == "CW":
         GPIO.output(DirectionPin,GPIO.LOW)
     else:
@@ -26,8 +26,31 @@ def PreciseTurn( dir, steps):
         time.sleep(StepPauseTime)
         GPIO.output(StepPin, GPIO.LOW)
         time.sleep(StepPauseTime)
-    return
 
+
+# Function to turn the stepper motor, which is connected to a bigger gear
+bigToSmallRatio = 123/25.           # Gear ratio
+degreesPerStep = 1.8 / 8            # Using an 1.8 degree stepper motor, operating at 1/8th steps, fill in 1.8 / 8
+def turnDegrees( degrees):
+
+    # Check the direction to turn
+    if degrees < 0:
+        GPIO.output(DirectionPin,GPIO.HIGH)     # CCW
+        degrees = degrees * -1
+    else:
+        GPIO.output(DirectionPin,GPIO.LOW)      # CW
+
+    # Determine the amount of steps to turn by
+    smallGearToTurn = bigToSmallRatio * degrees
+    stepsToTake  = smallGearToTurn / degreesPerStep
+
+    # Turn the stepper
+    for i in range(int(stepsToTake)):
+        GPIO.output(StepPin, GPIO.HIGH)
+        time.sleep(StepPauseTime)
+        GPIO.output(StepPin, GPIO.LOW)
+        time.sleep(StepPauseTime)
+    
 
 
 if __name__ == "__main__":
@@ -36,15 +59,23 @@ if __name__ == "__main__":
         steps = int(sys.argv[2])
         if (dir == "CW" or dir == "CCW"):
             if (steps > 0 and steps <= 2000):
-                PreciseTurn(dir, steps)
+                turnSteps(dir, steps)
             else: print("Amount of steps not valid. (0 - 2000)")
         else:print ("Direction not valid. (CW or CCW)")
 
+    elif len(sys.argv) == 2:
+        degrees = float(sys.argv[1])
+        if degrees > -360 and degrees < 360:
+            turnDegrees(degrees)
+        else: print("Degrees number not valid. (-360 - 360)")
+        
+        
+
     else:
         print("MoveStepper test use case (R-L-R)")
-        PreciseTurn("CW",250)
-        PreciseTurn("CCW",500)
-        PreciseTurn("CW",250)
+        turnSteps("CW",250)
+        turnSteps("CCW",500)
+        turnSteps("CW",250)
                     
 
     
