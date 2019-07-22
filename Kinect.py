@@ -325,8 +325,8 @@ while 1:
         toTurnAngle = degreesPerPixelX * horizPixelDistanceFromCenter
         launchAngle = degreesPerPixelY * vertPixelDistanceFromHorizon
 
-        if toTurnAngle < -5 or toTurnAngle > 5:
-            subprocess.call("python2.7 MoveStepper.py " + str(toTurnAngle))
+        if toTurnAngle < -1 or toTurnAngle > 1:
+            subprocess.call( [ 'python2.7', 'MoveStepper.py', str(toTurnAngle) ] )
             #MoveStepper.turnDegrees(toTurnAngle)
 
         else:
