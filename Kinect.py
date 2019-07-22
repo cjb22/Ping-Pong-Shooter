@@ -5,9 +5,11 @@ import cv2
 import frame_convert2
 import time
 import math
+import MoveStepper
 
 
-#Set up named windows
+
+#Set up OpenCV named windows to display the picture
 cv2.namedWindow('Depth')
 # Depth = 480 x 640
 #cv2.namedWindow('Video')
@@ -36,8 +38,15 @@ def get_depth(img):
 def get_video():
     return frame_convert2.video_cv(freenect.sync_get_video()[0])
 
+#Depth camera general information
+xRes, yRes = 640, 480                                   # Width x Height  = 640 x 480 pixels
+horizonY = 360                                          # The Y pixel height which corresponds to horizontal plane (depends on physical angle of the Kinect)
+xFOV, yFOV = math.radians(58.5), math.radians(46.6)     # Field of view dimensions (degrees)
+radiansPerPixelX = xFOV / xRes                          # For simplification, a perfect camera model is assumed
+radiansPerPixelY = yFOV / yRes
+
+
 #Function to check if a point is within specified coordinates
-xRes, yRes = 640, 480           # Width x Height  = 640 x 480
 boundaryThresholdX = 30
 boundaryThresholdY = 80
 def insideBoundaries(x, y):
@@ -100,12 +109,8 @@ def drawSegments(segments, Thickness, drawWithAlternatingThickness = False):
            
 #Calculate actual distance in meters using a Kinect 360 reading
 def distanceInMeters(kinectReading):
-    #Depth sensing
-    #pX, pY = 640/2, 480/2
     #distKin     = rawDepth [pY,pX]
     #dist = distanceInMeters(distKin)
-    #cv2.circle(imgray,(pX,pY), 7, (0,255,0), -1)
-    #cv2.putText(imgray, str(dist), (pX - 20, pY - 20), cv2.FONT_HERSHEY_SIMPLEX, 4, (0, 255, 0), 4)
     return 0.1236 * math.tan( kinectReading / 2842.5 + 1.1863)
 
 #Function to find the center pixel location of a contour segment
@@ -281,40 +286,63 @@ while 1:
     handCoordinatesClose    = findPersistentCenterPoints(centerPointsClose, lastFoundClose)
     handCoordinatesMid      = findPersistentCenterPoints(centerPointsMid,   lastFoundMid)
     handCoordinatesFar      = findPersistentCenterPoints(centerPointsFar,   lastFoundFar)
-    
-    #Draw the (potential) hand segments, and draw circles around persisting hand-shaped line segments
-    drawSegments(handshapesClose,   2)
-    drawSegments(handshapesMid,     4)
-    drawSegments(handshapesFar,     6)
-
-    
-    
-    
-
-    if not handCoordinatesClose == (-1,-1):
-        cv2.circle(imgray, handCoordinatesClose, 12, (0,255,0), 4)
-        print "Close: ", handCoordinatesClose
-
-    elif not handCoordinatesMid == (-1,-1):
-        cv2.circle(imgray, handCoordinatesMid, 14, (0,255,0), 4)
-        print "Mid: ", handCoordinatesMid
-        
-    elif not handCoordinatesFar == (-1,-1):
-        cv2.circle(imgray, handCoordinatesFar, 16, (0,255,0), 4)
-        print "Far: ", handCoordinatesFar
-    
-    #if( type(handCoordinatesClose) == None) 
-              
 
     #Add the most recent findings to the list
     lastFoundClose[iterCount]   = centerPointsClose    
     lastFoundMid[iterCount]     = centerPointsMid
     lastFoundFar[iterCount]     = centerPointsFar
+
+    #Draw the (potential) hand segments 
+    drawSegments(handshapesClose,   2)
+    drawSegments(handshapesMid,     4)
+    drawSegments(handshapesFar,     6)
+
+
+    #Find where to toss to  
+    tossRange = ""
+    toTossTo = (-1,-1)
+    if not handCoordinatesClose == (-1,-1):
+        cv2.circle(imgray, handCoordinatesClose, 12, (0,255,0), 4)
+        tossRange = "Close"
+        toTossTo = handCoordinatesClose
+
+    elif not handCoordinatesMid == (-1,-1):
+        cv2.circle(imgray, handCoordinatesMid, 14, (0,255,0), 4)
+        tossRange = "Mid"
+        toTossTo = handCoordinatesMid
+        
+    elif not handCoordinatesFar == (-1,-1):
+        cv2.circle(imgray, handCoordinatesFar, 16, (0,255,0), 4)
+        tossRange = "Far"
+        toTossTo = handCoordinatesFar
+
+    #Determine the angle which the Kinect needs to rotate to center the hand
+    if not toTossTo == (-1,-1):
+        
+        horizPixelDistanceFromCenter =  toTossTo[0] - ( xRes / 2 )
+        vertPixelDistanceFromHorizon  = horizonY - toTossTo[1]
+
+        toTurnAngle = radiansPerPixelX * horizPixelDistanceFromCenter
+        launchAngle = radiansPerPixelY * vertPixelDistanceFromHorizon
+        
+        
+        distanceToHand = distanceInMeters( rawDepth [toTossTo[1], toTossTo[0]] )
+        horizDistanceMeters = distanceToHand * math.sin(launchAngle)
+        vertDistanceMeters  = distanceToHand * math.cos(launchAngle)
+
+        #cv2.putText(imgray, "Up  (m): " + str(horizDistanceMeters), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0))
+        #cv2.putText(imgray, "Out (m): " + str(vertDistanceMeters),  (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0))
+
         
 
 
-     
+      
+    
 
+    #Draw the horizontal plane line and a center line
+    cv2.line(imgray,(0,horizonY),(639,horizonY),(0,255,0),1)
+    cv2.line(imgray,(xRes/2, horizonY - 50), (xRes/2 , horizonY + 50),(0,255,0),1)
+    
     #Display the image
     cv2.imshow('Depth', imgray)
     #cv2.imshow('Edges', edges)
