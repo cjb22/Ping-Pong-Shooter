@@ -1,5 +1,9 @@
-import pigpio
 import time
+import os
+os.system ("sudo pigpiod")
+time.sleep(1)
+import pigpio 
+
 
 pi = pigpio.pi() 
 
@@ -21,5 +25,7 @@ def activateHopper():
 
 setHopperServoHome()
 activateHopper()
+
+pi.stop()
 
 

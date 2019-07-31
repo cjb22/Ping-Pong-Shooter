@@ -6,6 +6,11 @@ import frame_convert2
 import time
 import math
 import subprocess
+import os
+os.system ("sudo pigpiod")
+time.sleep(1)               # Might not be necessary
+import pigpio 
+
 
 
 
@@ -31,6 +36,7 @@ cv2.setTrackbarPos('Contour Area', 'Depth',10)
 #cv2.createTrackbar('Closeness Threshold','Depth',0,300,nothing)
 #cv2.setTrackbarPos('Closeness Threshold', 'Depth',80)
 
+pi = pigpio.pi() 
 
 #Kinect Image Functions (video is unused)
 def get_depth(img):
@@ -221,9 +227,44 @@ def findPersistentCenterPoints(mostRecentCtrPoints, previousCtrPoints):
 
     return toReturn
 
+#Functions for the hopper servo
+hopperPin = 21
+def setHopperServoHome():
+    pi.set_servo_pulsewidth(hopperPin,1900)
+    time.sleep(0.2)
+    pi.set_servo_pulsewidth(hopperPin,0)
+
+def activateHopper():
+    pi.set_servo_pulsewidth(hopperPin,800)
+    time.sleep(0.2)
+    pi.set_servo_pulsewidth(hopperPin,1900)
+    time.sleep(0.25)
+    pi.set_servo_pulsewidth(hopperPin,0)
+
+
+#Function to activate the ESC Brushless Motors:
+escPin = 16
+
+def activateESC():
+    #Calibrate the maximum and minimum
+    pi.set_servo_pulsewidth(escPin, 2500)
+    time.sleep(0.8)
+    pi.set_servo_pulsewidth(escPin, 500)
+    time.sleep(0.8)
+
+    #Fire at speed 
+    pi.set_servo_pulsewidth(escPin, 1900)
+    time.sleep(3)
+
+    pi.set_servo_pulsewidth(escPin, 500)
+    pi.set_servo_pulsewidth(escPin, 0)
     
 
-#Main loop
+
+
+#Main Program
+setHopperServoHome()
+    
 while 1:
     #------------------------------------------------------------------------------
     #Measure start time
@@ -364,4 +405,5 @@ while 1:
     
 # When everything done, release the capture
 print 'FPS: ', FPS
+pi.stop()                   # Disconnect pigpio.
 cv2.destroyAllWindows()
