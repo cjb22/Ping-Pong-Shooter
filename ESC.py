@@ -5,19 +5,19 @@ time.sleep(1)
 import pigpio
 
 pi = pigpio.pi() 
-escPin = 16
+escPin = 20
 
 
 def activateESC():
     #Set maximum and minimum PWM
     pi.set_servo_pulsewidth(escPin, 2500)
-    time.sleep(0.8)
+    time.sleep(1)
     pi.set_servo_pulsewidth(escPin, 500) 
-    time.sleep(0.8)
+    time.sleep(1)
 
     #Fire the ESC 
-    pi.set_servo_pulsewidth(escPin, 1900)
-    time.sleep(3)
+    pi.set_servo_pulsewidth(escPin, 1700)
+    time.sleep(2)
 
     
 
