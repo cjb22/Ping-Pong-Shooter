@@ -247,7 +247,8 @@ scalingFactor = 1.              #An overall scaling factor for any necessary qui
 barrelAngle = 55                #The barrel angle (degrees)
 def findLaunchVelocity(distanceX, distanceY):
     velSquared = -9.81 * distanceX ** 2 / (2 * distanceY * math.cos(barrelAngle) ** 2) * 1 / (1 - math.tan(barrelAngle) * distanceX / distanceY)
-    vel = math.sqrt(velSquared)
+    vel = math.sqrt(abs(velSquared))
+    
     return vel
     
     
@@ -255,44 +256,57 @@ def findLaunchVelocity(distanceX, distanceY):
 escPin = 20
 flywheelOffAxisAngle    = 10    #The motors are mounted off axis to give spin for stability
 flywheelRadius          = 0.02  #In meters
-motorKVRating           = 1650  #Per volt applied, the motor will spin at this RPM
-escVoltage              = 6.5   #The input voltage to the esc. Should be a stable voltage for consistent results. 
-maxPWMPulsewidth        = 2500  #The high range PWM extreme for activating the ESC (max speed)
-minPWMPulsewidth        = 500   #The low range PWM extreme for activating the ESC (zero speed)
+motorKVRating           = 600   #Per volt applied, the motor will spin at this RPM (Depends on motor and load)
+escVoltage              = 6.6   #The input voltage to the esc. Should be a stable voltage for consistent results. 
+maxPWMPulsewidth        = 2100  #The high range PWM extreme for activating the ESC (max speed)
+minPWMPulsewidth        = 900  #The low range PWM extreme for activating the ESC (zero speed)
+
+
+#Calibrate the maximum and minimum PWM
+#This step makes the ESCs audibly beep, which gives a good alert for any persons nearby
+pi.set_servo_pulsewidth(escPin, maxPWMPulsewidth)
+#pi.set_servo_pulsewidth(escPin, 0)
+time.sleep(1)
+pi.set_servo_pulsewidth(escPin, minPWMPulsewidth)
+#pi.set_servo_pulsewidth(escPin, 0)
+time.sleep(1)
+    
 def launchBall(launchVelocity):
-    #Calibrate the maximum and minimum PWM
-    #This step makes the ESCs audibly beep, which gives a good alert for any persons nearby
-    pi.set_servo_pulsewidth(escPin, maxPWMPulsewidth)
-    time.sleep(0.8)
-    pi.set_servo_pulsewidth(escPin, minPWMPulsewidth)
-    time.sleep(0.8)
+
 
     #Calculate the required PWM signal
-    PWMSignal = 0
     wheelVelocity = launchVelocity / math.cos( math.radians( flywheelOffAxisAngle ) )
     wheelRPM = wheelVelocity * 60 / (2 * math.pi ) / flywheelRadius                                                                            # v = 2pi / 60 * r * RPM
     minimumRPM = 0
     maximumRPM = escVoltage * motorKVRating
     if wheelRPM > maximumRPM:
         print "Cant launch far enough"
-    
-    else: 
-        PWMSignal = np.interp(wheelRPM, [0, maximumRPM], [minPWMPulsewidth, maxPWMPulsewidth])
-        PWMSignal = int(PWMSignal)
-        
+        wheelRPM = maximumRPM - 30
 
     
-    #Fire at speed 
+    PWMSignal = np.interp(wheelRPM, [0, maximumRPM], [minPWMPulsewidth, maxPWMPulsewidth])
+    PWMSignal = int(PWMSignal)
+    
+    
+    print PWMSignal
+
+
+
+    #Fire at speed
     pi.set_servo_pulsewidth(escPin, PWMSignal)
+    #pi.set_servo_pulsewidth(escPin, 0)
     time.sleep(1)
 
     #Drop the ball down
     activateHopper()
-    time.sleep(2)
+    time.sleep(0.4)
     
     # Shut the ESC back down
-    pi.set_servo_pulsewidth(escPin, 500)
-    pi.set_servo_pulsewidth(escPin, 0)
+    pi.set_servo_pulsewidth(escPin, minPWMPulsewidth)
+    #pi.set_servo_pulsewidth(escPin, 0)
+
+
+    
     
 
 
@@ -415,8 +429,10 @@ while 1:
             #cv2.putText(imgray, "Up  (m): " + str(horizDistanceMeters), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0))
             #cv2.putText(imgray, "Out (m): " + str(vertDistanceMeters),  (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0))
 
+            #Wait for a few seconds (Won't need to catch again for at least this long ;)
+            time.sleep(3)
         
-
+            
 
     
     
