@@ -53,7 +53,7 @@ degreesPerPixelY = yFOV / yRes
 
 
 #Function to check if a point is within specified coordinates
-boundaryThresholdX = 30
+boundaryThresholdX = 20
 boundaryThresholdY = 80
 def insideBoundaries(x, y):
     if x < xRes - boundaryThresholdX and x > boundaryThresholdX:
@@ -188,7 +188,7 @@ def findHandshapes(contourSegments, Range):
                     hullArea = cv2.contourArea(cv2.convexHull(seg,returnPoints = True))
                     segArea = cv2.contourArea(seg)
                     segToHullRatio = hullArea / segArea
-                    if segArea > minArea and segToHullRatio > 1. and segToHullRatio < 1.5: 
+                    if segArea > minArea and segToHullRatio > 1.1 and segToHullRatio < 1.5: 
                         hulls.append(seg)
     return hulls
 
@@ -241,21 +241,56 @@ def activateHopper():
     time.sleep(0.25)
     pi.set_servo_pulsewidth(hopperPin,0)
 
-
+#Function to find the necessary speed to launch the ball
+#This speed is calculated using a parabolic trajectory, with the assumption that air resistance is negligible
+scalingFactor = 1.              #An overall scaling factor for any necessary quick tuning
+barrelAngle = 55                #The barrel angle (degrees)
+def findLaunchVelocity(distanceX, distanceY):
+    velSquared = -9.81 * distanceX ** 2 / (2 * distanceY * math.cos(barrelAngle) ** 2) * 1 / (1 - math.tan(barrelAngle) * distanceX / distanceY)
+    vel = math.sqrt(velSquared)
+    return vel
+    
+    
 #Function to activate the ESC Brushless Motors:
-escPin = 16
-
-def activateESC():
-    #Calibrate the maximum and minimum
-    pi.set_servo_pulsewidth(escPin, 2500)
+escPin = 20
+flywheelOffAxisAngle    = 10    #The motors are mounted off axis to give spin for stability
+flywheelRadius          = 0.02  #In meters
+motorKVRating           = 1650  #Per volt applied, the motor will spin at this RPM
+escVoltage              = 6.5   #The input voltage to the esc. Should be a stable voltage for consistent results. 
+maxPWMPulsewidth        = 2500  #The high range PWM extreme for activating the ESC (max speed)
+minPWMPulsewidth        = 500   #The low range PWM extreme for activating the ESC (zero speed)
+def launchBall(launchVelocity):
+    #Calibrate the maximum and minimum PWM
+    #This step makes the ESCs audibly beep, which gives a good alert for any persons nearby
+    pi.set_servo_pulsewidth(escPin, maxPWMPulsewidth)
     time.sleep(0.8)
-    pi.set_servo_pulsewidth(escPin, 500)
+    pi.set_servo_pulsewidth(escPin, minPWMPulsewidth)
     time.sleep(0.8)
 
+    #Calculate the required PWM signal
+    PWMSignal = 0
+    wheelVelocity = launchVelocity / math.cos( math.radians( flywheelOffAxisAngle ) )
+    wheelRPM = wheelVelocity * 60 / (2 * math.pi ) / flywheelRadius                                                                            # v = 2pi / 60 * r * RPM
+    minimumRPM = 0
+    maximumRPM = escVoltage * motorKVRating
+    if wheelRPM > maximumRPM:
+        print "Cant launch far enough"
+    
+    else: 
+        PWMSignal = np.interp(wheelRPM, [0, maximumRPM], [minPWMPulsewidth, maxPWMPulsewidth])
+        PWMSignal = int(PWMSignal)
+        
+
+    
     #Fire at speed 
-    pi.set_servo_pulsewidth(escPin, 1900)
-    time.sleep(3)
+    pi.set_servo_pulsewidth(escPin, PWMSignal)
+    time.sleep(1)
 
+    #Drop the ball down
+    activateHopper()
+    time.sleep(2)
+    
+    # Shut the ESC back down
     pi.set_servo_pulsewidth(escPin, 500)
     pi.set_servo_pulsewidth(escPin, 0)
     
@@ -375,6 +410,8 @@ while 1:
             horizDistanceMeters = distanceToHand * math.sin(math.radians(launchAngle))
             vertDistanceMeters  = distanceToHand * math.cos(math.radians(launchAngle))
 
+            launchVelocity = findLaunchVelocity(horizDistanceMeters, vertDistanceMeters)
+            launchBall(launchVelocity)
             #cv2.putText(imgray, "Up  (m): " + str(horizDistanceMeters), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0))
             #cv2.putText(imgray, "Out (m): " + str(vertDistanceMeters),  (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0))
 
