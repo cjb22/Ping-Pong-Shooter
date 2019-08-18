@@ -257,7 +257,7 @@ escPin = 20
 flywheelOffAxisAngle    = 10    #The motors are mounted off axis to give spin for stability
 flywheelRadius          = 0.02  #In meters
 motorKVRating           = 600   #Per volt applied, the motor will spin at this RPM (Depends on motor and load)
-escVoltage              = 6.6   #The input voltage to the esc. Should be a stable voltage for consistent results. 
+escVoltage              = 5.8   #The input voltage to the esc. Should be a stable voltage for consistent results. 
 maxPWMPulsewidth        = 2100  #The high range PWM extreme for activating the ESC (max speed)
 minPWMPulsewidth        = 900  #The low range PWM extreme for activating the ESC (zero speed)
 
