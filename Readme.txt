@@ -1,6 +1,6 @@
 This code is for a self-made Ping-Pong ball shooter which finds hands using a depth image and tosses a ball straight at it.
 The code is run on a Raspberry Pi 3 B+.
-Information and demonstrations at www.Tiny.cc/ShootingRobot
+Information and demonstrations at www.tiny.cc/ShootingRobot
 
 Main Program = Kinect.py (Python 2.7) 
 
