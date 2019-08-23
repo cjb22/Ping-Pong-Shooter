@@ -332,7 +332,7 @@ while 1:
     imgray = np.copy(rawDepth)
     imgray = get_depth(imgray)
 
-    #Use Canny algorithm to find contours on the depth image
+    #Use Canny algorithm to find edges on the depth image
     edges = cv2.Canny(imgray,cannyLow,cannyHigh,3)
 
     #Dilation and erosion to make the edges more pronounced
